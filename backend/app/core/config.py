@@ -21,13 +21,14 @@ class Settings:
     DATA_DIR: Path = BASE_DIR / "data" / "historical"
     
     # Twelve Data API
-    TWELVE_DATA_API_KEY: str = os.getenv("TWELVE_DATA_API_KEY", "")
+    TWELVE_DATA_API_KEY: str = os.getenv("TWELVE_DATA_API_KEY", "4a70df7cbd1745a98b311f88a60a750a")
     
     # CORS
-    CORS_ORIGINS: list = os.getenv(
+    _raw_cors: str = os.getenv(
         "CORS_ORIGINS", 
-        "http://localhost:5173,http://localhost:3000,https://stock-prize-pridiction.vercel.app"
-    ).split(",")
+        "https://stock-prize-pridiction.vercel.app,http://localhost:5173,http://localhost:3000,http://localhost:8000"
+    )
+    CORS_ORIGINS: list = [o.strip().rstrip("/") for o in _raw_cors.split(",") if o.strip()]
     
     # Cache settings
     CACHE_TTL_SECONDS: int = int(os.getenv("CACHE_TTL", "60"))

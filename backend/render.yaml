@@ -12,3 +12,8 @@ services:
         value: 3.11.0
       - key: CACHE_TTL
         value: 60
+      - key: TWELVE_DATA_API_KEY
+        value: 4a70df7cbd1745a98b311f88a60a750a
+      - key: CORS_ORIGINS
+        value: https://stock-prize-pridiction.vercel.app,http://localhost:5173,http://localhost:3000
+

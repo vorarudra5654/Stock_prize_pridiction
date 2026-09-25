@@ -7,8 +7,14 @@ import {
   postCustomPrediction,
 } from '../services/api';
 
+const DEFAULT_ASSETS = [
+  { id: 'reliance', name: 'Reliance Industries', symbol: 'RELIANCE.NS', currency: 'INR', type: 'stock' },
+  { id: 'bitcoin', name: 'Bitcoin', symbol: 'BTC-USD', currency: 'USD', type: 'crypto' },
+  { id: 'google', name: 'Alphabet / Google', symbol: 'GOOGL', currency: 'USD', type: 'stock' },
+];
+
 export const useAssetData = () => {
-  const [assets, setAssets] = useState([]);
+  const [assets, setAssets] = useState(DEFAULT_ASSETS);
   const [selectedAssetId, setSelectedAssetId] = useState('reliance');
   const [predictionData, setPredictionData] = useState(null);
   const [historicalData, setHistoricalData] = useState(null);
@@ -20,8 +26,14 @@ export const useAssetData = () => {
   // Load supported assets list on mount
   useEffect(() => {
     fetchAssets()
-      .then(setAssets)
-      .catch((err) => console.error('Error fetching assets:', err));
+      .then((data) => {
+        if (Array.isArray(data) && data.length > 0) {
+          setAssets(data);
+        }
+      })
+      .catch((err) => {
+        console.warn('Using default asset configuration:', err.message);
+      });
   }, []);
 
   const loadAssetData = useCallback(async (assetId) => {

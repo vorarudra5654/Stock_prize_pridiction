@@ -232,7 +232,14 @@ Evaluation metrics ($R^2$, MAE, RMSE, MAPE) are calculated strictly on the unsee
 ## 🚀 Cloud Deployment Configuration
 
 * **Backend Deployment:** Configured for [Render](https://render.com) via `render.yaml`. Automated build command runs `pip install` and executes `train_all_models.py` during deployment.
-* **Frontend Deployment:** Production static build via Vite (`npm run build`) optimized for [Vercel](https://vercel.com).
+* **Frontend Deployment:** Production static build via Vite (`npm run build`) optimized for [Vercel](https://vercel.com) or [Netlify](https://netlify.com).
+* **Crucial Environment Variable for Hosted Frontend:**
+  Set `VITE_API_BASE_URL` in your hosting provider's Environment Variables panel pointing to your deployed FastAPI backend URL:
+  ```env
+  VITE_API_BASE_URL=https://<your-backend-name>.onrender.com
+  ```
+  *Note: If `VITE_API_BASE_URL` is omitted, the frontend defaults to `http://localhost:8000` in local development mode.*
+
 
 ---
 
