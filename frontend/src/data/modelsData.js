@@ -335,12 +335,13 @@ export const MODELS_LIST = [
 ];
 
 export const getModelBySlug = (slugOrKey) => {
-  if (!slugOrKey) return null;
+  if (!slugOrKey) return MODELS_LIST[0];
   const clean = slugOrKey.toLowerCase().trim();
-  return MODELS_LIST.find(
+  const found = MODELS_LIST.find(
     (m) =>
       m.slug === clean ||
       m.key === clean ||
       (m.aliasSlugs && m.aliasSlugs.includes(clean))
   );
+  return found || MODELS_LIST[0];
 };

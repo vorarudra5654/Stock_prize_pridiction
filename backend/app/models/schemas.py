@@ -22,21 +22,29 @@ class MarketDataResponse(BaseModel):
     symbol: str
     currency: str
     timestamp: str
-    open: float
-    high: float
-    low: float
-    volume: float
+    open: Optional[float] = None
+    high: Optional[float] = None
+    low: Optional[float] = None
+    close: Optional[float] = None
+    volume: Optional[float] = None
     source: str
     is_delayed: bool
+    market_status: Optional[str] = "open"
+    prediction_status: Optional[str] = "active"
+    message: Optional[str] = "Market Active"
+    current_date: Optional[str] = None
+    timezone: Optional[str] = "UTC"
 
 class SingleModelPrediction(BaseModel):
     model_key: str
     model_name: str
     features_used: List[str]
-    predicted_close: float
-    open_price: float
-    diff_from_open: float
-    percentage_diff: float
+    predicted_close: Optional[float] = None
+    open_price: Optional[float] = None
+    diff_from_open: Optional[float] = None
+    percentage_diff: Optional[float] = None
+    actual_close: Optional[float] = None
+    prediction_error: Optional[float] = None
 
 class PredictionResponse(BaseModel):
     asset_id: str
@@ -44,10 +52,16 @@ class PredictionResponse(BaseModel):
     symbol: str
     currency: str
     timestamp: str
+    market_status: str
+    prediction_status: str
+    message: str
+    current_date: str
+    timezone: str
     market_data: MarketDataResponse
     recommended_best_model: str
     recommended_best_model_name: str
     predictions: Dict[str, SingleModelPrediction]
+
 
 class CustomPredictionRequest(BaseModel):
     asset_id: str

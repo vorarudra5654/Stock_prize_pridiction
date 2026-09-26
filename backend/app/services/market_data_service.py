@@ -64,6 +64,7 @@ def _fetch_from_twelve_data(asset: AssetConfig) -> Optional[Dict[str, Any]]:
                 low_val = float(data.get("low", open_val)) if data.get("low") else open_val
                 volume_val = float(data.get("volume", 0)) if data.get("volume") else 0.0
                 
+                close_val = float(data["close"]) if data.get("close") else None
                 return {
                     "asset_id": asset.id,
                     "asset_name": asset.name,
@@ -73,6 +74,7 @@ def _fetch_from_twelve_data(asset: AssetConfig) -> Optional[Dict[str, Any]]:
                     "open": round(open_val, 4),
                     "high": round(high_val, 4),
                     "low": round(low_val, 4),
+                    "close": round(close_val, 4) if close_val is not None else None,
                     "volume": round(volume_val, 2),
                     "source": "Twelve Data API",
                     "is_delayed": data.get("is_market_open", True) == False
@@ -81,18 +83,50 @@ def _fetch_from_twelve_data(asset: AssetConfig) -> Optional[Dict[str, Any]]:
         print(f"[Warning] Twelve Data API call failed for {asset.name}: {e}")
     return None
 
+import datetime
+import numpy as np
+
 def _fetch_from_yfinance_fallback(asset: AssetConfig) -> Dict[str, Any]:
     """
-    Fallback method using yfinance to fetch the latest market day data.
+    Fallback method using yfinance fast_info and history to fetch today's live market day data.
     """
+    today_str = datetime.date.today().strftime("%Y-%m-%d")
     ticker = yf.Ticker(asset.symbol_yfinance)
+
+    # 1. Try fast_info for live today quote
+    try:
+        fi = ticker.fast_info
+        open_val = float(fi.open) if hasattr(fi, "open") and fi.open and not np.isnan(fi.open) else None
+        high_val = float(fi.day_high) if hasattr(fi, "day_high") and fi.day_high and not np.isnan(fi.day_high) else open_val
+        low_val = float(fi.day_low) if hasattr(fi, "day_low") and fi.day_low and not np.isnan(fi.day_low) else open_val
+        close_val = float(fi.last_price) if hasattr(fi, "last_price") and fi.last_price and not np.isnan(fi.last_price) else None
+        vol_val = float(fi.last_volume) if hasattr(fi, "last_volume") and fi.last_volume and not np.isnan(fi.last_volume) else 0.0
+
+        if open_val and open_val > 0:
+            return {
+                "asset_id": asset.id,
+                "asset_name": asset.name,
+                "symbol": asset.symbol_yfinance,
+                "currency": asset.currency,
+                "timestamp": today_str,
+                "open": round(open_val, 4),
+                "high": round(high_val, 4),
+                "low": round(low_val, 4),
+                "close": round(close_val, 4) if close_val is not None else None,
+                "volume": round(vol_val, 2),
+                "source": "yfinance (Real-time Live Quote)",
+                "is_delayed": False
+            }
+    except Exception as e:
+        print(f"[Warning] fast_info fetch failed for {asset.name}: {e}")
+
+    # 2. Fallback to 5d history
     hist = ticker.history(period="5d")
-    
     if hist.empty:
         raise RuntimeError(f"Unable to fetch market data for {asset.name} from any source.")
 
     latest_row = hist.iloc[-1]
-    last_date = hist.index[-1].strftime("%Y-%m-%d")
+    last_date = today_str  # Ensure timestamp reflects today's prediction date
 
     return {
         "asset_id": asset.id,
@@ -103,7 +137,10 @@ def _fetch_from_yfinance_fallback(asset: AssetConfig) -> Dict[str, Any]:
         "open": round(float(latest_row["Open"]), 4),
         "high": round(float(latest_row["High"]), 4),
         "low": round(float(latest_row["Low"]), 4),
+        "close": round(float(latest_row["Close"]), 4),
         "volume": round(float(latest_row["Volume"]), 2),
         "source": "yfinance (Real-time Fallback)",
         "is_delayed": True
     }
+
+

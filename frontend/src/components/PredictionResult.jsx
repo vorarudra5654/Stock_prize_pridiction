@@ -8,6 +8,11 @@ import {
   AlertCircle,
   Loader2,
   Sparkles,
+  Clock,
+  CalendarOff,
+  CheckCheck,
+  Calendar,
+  Globe
 } from 'lucide-react';
 import { formatCurrency, formatPercent } from '../utils/formatters';
 
@@ -19,6 +24,19 @@ const PredictionResult = ({
   loading = false,
   error = null,
 }) => {
+  const todayDateStr = predictionData?.timestamp || predictionData?.date || new Date().toISOString().substring(0, 10);
+  const timezoneStr = predictionData?.timezone || '';
+
+  const formattedTodayDate = React.useMemo(() => {
+    try {
+      const d = new Date(todayDateStr + 'T00:00:00');
+      if (isNaN(d.getTime())) return todayDateStr;
+      return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+    } catch {
+      return todayDateStr;
+    }
+  }, [todayDateStr]);
+
   if (loading) {
     return (
       <div className="prediction-result-card loading-state">
@@ -39,9 +57,87 @@ const PredictionResult = ({
     );
   }
 
-  if (!predictionData || !predictionData.predictions) return null;
+  if (!predictionData) return null;
 
-  const pred = predictionData.predictions[modelKey];
+  const marketStatus = predictionData.market_status || 'open';
+  const predictionStatus = predictionData.prediction_status || 'active';
+  const statusMessage = predictionData.message || '';
+
+  // Non-trading day state (Weekend or Market Holiday)
+  if (marketStatus === 'closed_weekend_holiday') {
+    return (
+      <div className="prediction-result-card info-state">
+        <div className="result-header">
+          <div>
+            <span className="result-badge warning">Market Closed</span>
+            <h2 className="result-model-name">{modelName}</h2>
+          </div>
+          <div className="status-banner-pill">
+            <CalendarOff size={16} /> Non-Trading Day
+          </div>
+        </div>
+
+        {/* Current Date Banner */}
+        <div className="result-today-date-row">
+          <div className="today-date-badge font-mono">
+            <Calendar size={14} />
+            <span>Current Market Date: <strong>{formattedTodayDate}</strong> ({todayDateStr})</span>
+            {timezoneStr && (
+              <span className="tz-tag">
+                <Globe size={11} /> {timezoneStr}
+              </span>
+            )}
+          </div>
+        </div>
+
+        <div className="market-status-body">
+          <p className="status-msg-main">{statusMessage}</p>
+          <p className="status-msg-sub">
+            No live Close price prediction is generated on weekends or market holidays. Predictions resume at market open on the next trading day.
+          </p>
+        </div>
+      </div>
+    );
+  }
+
+  // Before Market Open state (Trading Day, before opening bell)
+  if (marketStatus === 'before_open') {
+    return (
+      <div className="prediction-result-card info-state">
+        <div className="result-header">
+          <div>
+            <span className="result-badge info">Before Market Open</span>
+            <h2 className="result-model-name">{modelName}</h2>
+          </div>
+          <div className="status-banner-pill info">
+            <Clock size={16} /> Waiting for Open
+          </div>
+        </div>
+
+        {/* Current Date Banner */}
+        <div className="result-today-date-row">
+          <div className="today-date-badge font-mono">
+            <Calendar size={14} />
+            <span>Current Market Date: <strong>{formattedTodayDate}</strong> ({todayDateStr})</span>
+            {timezoneStr && (
+              <span className="tz-tag">
+                <Globe size={11} /> {timezoneStr}
+              </span>
+            )}
+          </div>
+        </div>
+
+        <div className="market-status-body">
+          <p className="status-msg-main">{statusMessage}</p>
+          <p className="status-msg-sub">
+            Today's actual opening price is not available yet. The ML model will automatically calculate today's Close prediction as soon as the opening bell rings.
+          </p>
+        </div>
+      </div>
+    );
+  }
+
+  const pred = predictionData.predictions?.[modelKey];
   if (!pred) return null;
 
   const isRecommended = predictionData.recommended_best_model === modelKey;
@@ -58,7 +154,9 @@ const PredictionResult = ({
 
       <div className="result-header">
         <div>
-          <span className="result-badge">Prediction Output</span>
+          <span className="result-badge">
+            {predictionStatus === 'completed' ? 'Session Evaluated' : 'Today\'s Prediction'}
+          </span>
           <h2 className="result-model-name">{pred.model_name || modelName}</h2>
         </div>
         <div className="result-features-pill">
@@ -66,9 +164,22 @@ const PredictionResult = ({
         </div>
       </div>
 
+      {/* Current Date Banner */}
+      <div className="result-today-date-row">
+        <div className="today-date-badge font-mono">
+          <Calendar size={14} />
+          <span>Current Market Date: <strong>{formattedTodayDate}</strong> ({todayDateStr})</span>
+          {timezoneStr && (
+            <span className="tz-tag">
+              <Globe size={11} /> {timezoneStr}
+            </span>
+          )}
+        </div>
+      </div>
+
       <div className="result-main-display">
         <div className="predicted-price-block">
-          <span className="price-label">Predicted Session Close Price</span>
+          <span className="price-label">Today's Predicted Close Price</span>
           <div className="price-value-row">
             <span className="price-number">
               {formatCurrency(pred.predicted_close, currency)}
@@ -94,28 +205,36 @@ const PredictionResult = ({
 
       <div className="result-meta-row">
         <div className="meta-item">
-          <span className="meta-label">Input Session Open</span>
+          <span className="meta-label">Today's Actual Open</span>
           <span className="meta-val">{formatCurrency(pred.open_price, currency)}</span>
         </div>
 
-        {predictionData.market_data?.high && (
+        {pred.actual_close !== null && pred.actual_close !== undefined && (
           <div className="meta-item">
-            <span className="meta-label">Reference High</span>
-            <span className="meta-val">{formatCurrency(predictionData.market_data.high, currency)}</span>
+            <span className="meta-label">Today's Actual Close</span>
+            <span className="meta-val highlight">{formatCurrency(pred.actual_close, currency)}</span>
           </div>
         )}
 
-        {predictionData.market_data?.low && (
+        {pred.prediction_error !== null && pred.prediction_error !== undefined && (
           <div className="meta-item">
-            <span className="meta-label">Reference Low</span>
-            <span className="meta-val">{formatCurrency(predictionData.market_data.low, currency)}</span>
+            <span className="meta-label">Prediction Error</span>
+            <span className="meta-val">{formatCurrency(pred.prediction_error, currency)}</span>
           </div>
         )}
 
         <div className="meta-item">
-          <span className="meta-label">Model Status</span>
+          <span className="meta-label">Prediction Status</span>
           <span className="meta-status">
-            <CheckCircle2 size={13} className="success-icon" /> Inferred Successfully
+            {predictionStatus === 'completed' ? (
+              <>
+                <CheckCheck size={13} className="success-icon" /> Session Completed & Evaluated
+              </>
+            ) : (
+              <>
+                <CheckCircle2 size={13} className="success-icon" /> Active Today's Prediction
+              </>
+            )}
           </span>
         </div>
       </div>
@@ -124,3 +243,4 @@ const PredictionResult = ({
 };
 
 export default PredictionResult;
+

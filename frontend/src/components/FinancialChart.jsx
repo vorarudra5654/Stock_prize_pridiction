@@ -13,6 +13,7 @@ import {
   TrendingUp,
   Coins,
   Globe,
+  Calendar,
 } from 'lucide-react';
 import { formatCurrency, formatPercent } from '../utils/formatters';
 
@@ -168,8 +169,83 @@ const FinancialChart = ({
         `;
       }
 
-      const openStr = val1 !== undefined ? formatCurrency(val1, currency) : 'N/A';
-      const closeStr = val2 !== undefined ? formatCurrency(val2, currency) : 'N/A';
+      const isLatestSession = date === latestSession?.date || date === 'Latest' || !date;
+      const openStr = val1 !== undefined && val1 !== null ? formatCurrency(val1, currency) : 'N/A';
+      const closeStr = val2 !== undefined && val2 !== null ? formatCurrency(val2, currency) : 'N/A';
+      
+      const marketStatus = predictionData?.market_status || 'open';
+      const statusMessage = predictionData?.message || '';
+      const predCloseVal = currentPrediction?.predicted_close;
+      const predStr = predCloseVal !== undefined && predCloseVal !== null ? formatCurrency(predCloseVal, currency) : null;
+      const modelName = currentPrediction?.model_name || 'ML Model';
+
+      if (isLatestSession) {
+        if (marketStatus === 'closed_weekend_holiday') {
+          return `
+            <div class="hover-legend-content">
+              <span class="legend-date">${date || 'Today'}</span>
+              <span class="legend-divider">|</span>
+              <span class="legend-item"><span class="legend-label" style="color: #F59E0B;">● Market Closed:</span> <strong>Weekend / Holiday</strong></span>
+              <span class="legend-divider">|</span>
+              <span class="legend-item"><span class="legend-label">Status:</span> <span>No live prediction generated today</span></span>
+            </div>
+          `;
+        }
+
+        if (marketStatus === 'before_open') {
+          return `
+            <div class="hover-legend-content">
+              <span class="legend-date">${date || 'Today'}</span>
+              <span class="legend-divider">|</span>
+              <span class="legend-item"><span class="legend-label" style="color: #38BDF8;">● Before Open:</span> <strong>${statusMessage}</strong></span>
+              <span class="legend-divider">|</span>
+              <span class="legend-item"><span class="legend-label">Status:</span> <span>Prediction waiting for actual Open price</span></span>
+            </div>
+          `;
+        }
+
+        if (marketStatus === 'after_close') {
+          const actualCloseVal = currentPrediction?.actual_close || val2;
+          const actualCloseStr = actualCloseVal ? formatCurrency(actualCloseVal, currency) : closeStr;
+          const errVal = currentPrediction?.prediction_error;
+          const errStr = errVal !== undefined && errVal !== null ? formatCurrency(errVal, currency) : '';
+
+          return `
+            <div class="hover-legend-content">
+              <span class="legend-date">${date || 'Today'} (Session Closed)</span>
+              <span class="legend-divider">|</span>
+              <span class="legend-item"><span class="legend-label">Actual Open:</span> <strong>${openStr}</strong></span>
+              <span class="legend-divider">|</span>
+              <span class="legend-item"><span class="legend-label">Predicted Close (${modelName}):</span> <strong style="color: #38BDF8;">${predStr || 'N/A'}</strong></span>
+              <span class="legend-divider">|</span>
+              <span class="legend-item"><span class="legend-label">Actual Close:</span> <strong>${actualCloseStr}</strong></span>
+              ${errStr ? `<span class="legend-divider">|</span><span class="legend-item"><span class="legend-label">Error:</span> <span class="text-rose">${errStr}</span></span>` : ''}
+            </div>
+          `;
+        }
+
+        // Default: Market Open (Session in progress)
+        const diffFromOpen = predCloseVal && val1 ? predCloseVal - val1 : undefined;
+        const diffPct = val1 && diffFromOpen !== undefined ? (diffFromOpen / val1) * 100 : undefined;
+        let diffStr = '';
+        if (diffFromOpen !== undefined && diffPct !== undefined) {
+          const sign = diffFromOpen >= 0 ? '+' : '';
+          const colorClass = diffFromOpen >= 0 ? 'text-emerald' : 'text-rose';
+          diffStr = `<span class="${colorClass}">Est Diff vs Open: ${sign}${formatCurrency(diffFromOpen, currency)} (${formatPercent(diffPct)})</span>`;
+        }
+
+        return `
+          <div class="hover-legend-content">
+            <span class="legend-date">${date || 'Today'} (Market Open)</span>
+            <span class="legend-divider">|</span>
+            <span class="legend-item"><span class="legend-label">Actual Open:</span> <strong>${openStr}</strong></span>
+            ${predStr ? `<span class="legend-divider">|</span><span class="legend-item"><span class="legend-label">Predicted Close (${modelName}):</span> <strong style="color: #38BDF8;">${predStr}</strong></span>` : ''}
+            ${diffStr ? `<span class="legend-divider">|</span><span class="legend-item">${diffStr}</span>` : ''}
+          </div>
+        `;
+      }
+
+      // Past Settled Session: Show Open & Actual Close
       let diffStr = '';
       if (change !== undefined && changePct !== undefined) {
         const sign = change >= 0 ? '+' : '';
@@ -179,16 +255,16 @@ const FinancialChart = ({
 
       return `
         <div class="hover-legend-content">
-          <span class="legend-date">${date || 'Latest'}</span>
+          <span class="legend-date">${date}</span>
           <span class="legend-divider">|</span>
           <span class="legend-item"><span class="legend-label">Open:</span> <strong>${openStr}</strong></span>
           <span class="legend-divider">|</span>
-          <span class="legend-item"><span class="legend-label">Close:</span> <strong>${closeStr}</strong></span>
+          <span class="legend-item"><span class="legend-label">Actual Close:</span> <strong>${closeStr}</strong></span>
           ${diffStr ? `<span class="legend-divider">|</span><span class="legend-item">${diffStr}</span>` : ''}
         </div>
       `;
     },
-    [currency]
+    [currency, currentPrediction, latestSession, predictionData]
   );
 
   // Helper to format black semi-transparent floating tooltip box
@@ -223,34 +299,126 @@ const FinancialChart = ({
         `;
       }
 
-      const openStr = val1 !== undefined ? formatCurrency(val1, currency) : 'N/A';
-      const closeStr = val2 !== undefined ? formatCurrency(val2, currency) : 'N/A';
+      const isLatestSession = date === latestSession?.date || date === 'Latest Session' || !date;
+      const openStr = val1 !== undefined && val1 !== null ? formatCurrency(val1, currency) : 'N/A';
+      const closeStr = val2 !== undefined && val2 !== null ? formatCurrency(val2, currency) : 'N/A';
+      
+      const marketStatus = predictionData?.market_status || 'open';
+      const statusMessage = predictionData?.message || '';
+      const predCloseVal = currentPrediction?.predicted_close;
+      const predStr = predCloseVal !== undefined && predCloseVal !== null ? formatCurrency(predCloseVal, currency) : null;
+      const modelName = currentPrediction?.model_name || 'ML Model';
+
+      if (isLatestSession) {
+        if (marketStatus === 'closed_weekend_holiday') {
+          return `
+            <div class="tt-date">${date || 'Today'} <span style="color: #F59E0B; font-size: 0.725rem;">● Market Closed</span></div>
+            <div class="tt-row">
+              <span class="tt-label">Market Status:</span>
+              <span class="tt-val" style="color: #F59E0B;">Weekend / Holiday</span>
+            </div>
+            <div class="tt-row" style="font-size: 0.7rem; color: #94A3B8; margin-top: 4px;">
+              <span>No prediction available today</span>
+            </div>
+          `;
+        }
+
+        if (marketStatus === 'before_open') {
+          return `
+            <div class="tt-date">${date || 'Today'} <span style="color: #38BDF8; font-size: 0.725rem;">● Before Open</span></div>
+            <div class="tt-row">
+              <span class="tt-label">Opening Bell:</span>
+              <span class="tt-val" style="color: #38BDF8;">${statusMessage}</span>
+            </div>
+            <div class="tt-row" style="font-size: 0.7rem; color: #94A3B8; margin-top: 4px;">
+              <span>Prediction will generate at market open</span>
+            </div>
+          `;
+        }
+
+        if (marketStatus === 'after_close') {
+          const actualCloseVal = currentPrediction?.actual_close || val2;
+          const actualCloseStr = actualCloseVal ? formatCurrency(actualCloseVal, currency) : closeStr;
+          const errVal = currentPrediction?.prediction_error;
+          const errStr = errVal !== undefined && errVal !== null ? formatCurrency(errVal, currency) : '';
+
+          return `
+            <div class="tt-date">${date || 'Today'} <span style="color: #10B981; font-size: 0.725rem;">● Session Closed</span></div>
+            <div class="tt-row">
+              <span class="tt-label">Actual Open Price:</span>
+              <span class="tt-val tt-bold">${openStr}</span>
+            </div>
+            <div class="tt-row">
+              <span class="tt-label" style="color: #38BDF8;">Predicted Close (${modelName}):</span>
+              <span class="tt-val tt-bold" style="color: #38BDF8;">${predStr || 'N/A'}</span>
+            </div>
+            <div class="tt-row">
+              <span class="tt-label">Actual Session Close:</span>
+              <span class="tt-val tt-bold">${actualCloseStr}</span>
+            </div>
+            ${errStr ? `<div class="tt-row"><span class="tt-label">Prediction Error:</span><span class="tt-val tt-rose">${errStr}</span></div>` : ''}
+          `;
+        }
+
+        // Default: Market Open
+        const diffFromOpen = predCloseVal && val1 ? predCloseVal - val1 : undefined;
+        const diffPct = val1 && diffFromOpen !== undefined ? (diffFromOpen / val1) * 100 : undefined;
+        let diffRow = '';
+        if (diffFromOpen !== undefined && diffPct !== undefined) {
+          const sign = diffFromOpen >= 0 ? '+' : '';
+          const colorClass = diffFromOpen >= 0 ? 'tt-emerald' : 'tt-rose';
+          diffRow = `
+            <div class="tt-row">
+              <span class="tt-label">Est Direction vs Open:</span>
+              <span class="tt-val ${colorClass}">${sign}${formatCurrency(diffFromOpen, currency)} (${formatPercent(diffPct)})</span>
+            </div>
+          `;
+        }
+
+        return `
+          <div class="tt-date">${date || 'Today'} <span style="color: #38BDF8; font-size: 0.725rem;">● Market Open</span></div>
+          <div class="tt-row">
+            <span class="tt-label">Actual Open Price:</span>
+            <span class="tt-val tt-bold">${openStr}</span>
+          </div>
+          <div class="tt-row" style="border-top: 1px dashed rgba(255,255,255,0.15); margin-top: 4px; padding-top: 4px;">
+            <span class="tt-label" style="color: #38BDF8;">Predicted Close (${modelName}):</span>
+            <span class="tt-val tt-bold" style="color: #38BDF8;">${predStr || 'Calculating...'}</span>
+          </div>
+          ${diffRow}
+          <div class="tt-row" style="font-size: 0.675rem; color: #94A3B8; margin-top: 3px;">
+            <span>Status: Session In Progress (Close Unsettled)</span>
+          </div>
+        `;
+      }
+
+      // Past Settled Session Tooltip Box
       let diffRow = '';
       if (change !== undefined && changePct !== undefined) {
         const sign = change >= 0 ? '+' : '';
         const colorClass = change >= 0 ? 'tt-emerald' : 'tt-rose';
         diffRow = `
           <div class="tt-row">
-            <span class="tt-label">Change:</span>
+            <span class="tt-label">Session Change:</span>
             <span class="tt-val ${colorClass}">${sign}${formatCurrency(change, currency)} (${formatPercent(changePct)})</span>
           </div>
         `;
       }
 
       return `
-        <div class="tt-date">${date || 'Latest Session'}</div>
+        <div class="tt-date">${date || 'Historical Session'}</div>
         <div class="tt-row">
-          <span class="tt-label">Open Price:</span>
+          <span class="tt-label">Historical Open:</span>
           <span class="tt-val">${openStr}</span>
         </div>
         <div class="tt-row">
-          <span class="tt-label">Close Price:</span>
+          <span class="tt-label">Actual Close:</span>
           <span class="tt-val tt-bold">${closeStr}</span>
         </div>
         ${diffRow}
       `;
     },
-    [currency]
+    [currency, currentPrediction, latestSession, predictionData]
   );
 
   // Initialize TradingView Lightweight Chart
@@ -354,29 +522,50 @@ const FinancialChart = ({
       }));
       openSeries.setData(openData);
 
-      // 3. ML Model Predicted Close Line Series (Dashed line starting at last actual date)
-      if (currentPrediction && currentPrediction.predicted_close) {
+      // 3. ML Model Predicted Close Line Series (Dashed line for Today's Prediction)
+      if (currentPrediction && currentPrediction.predicted_close && activeTab === 'historical') {
         const lastRec = sanitizedRecords[sanitizedRecords.length - 1];
         if (lastRec) {
-          const lastD = new Date(lastRec.date);
-          lastD.setDate(lastD.getDate() + 1);
-          if (lastD.getDay() === 6) lastD.setDate(lastD.getDate() + 2);
-          if (lastD.getDay() === 0) lastD.setDate(lastD.getDate() + 1);
-          const nextDateStr = lastD.toISOString().substring(0, 10);
+          const todayDateStr = predictionData?.timestamp || predictionData?.date || new Date().toISOString().substring(0, 10);
+          
+          let predStartPoint = { time: lastRec.date, value: lastRec.close };
+          let predEndPoint = { time: todayDateStr, value: currentPrediction.predicted_close };
+
+          if (lastRec.date === todayDateStr && sanitizedRecords.length > 1) {
+            const prevRec = sanitizedRecords[sanitizedRecords.length - 2];
+            predStartPoint = { time: prevRec.date, value: prevRec.close };
+          }
 
           const predSeries = chart.addSeries(LineSeries, {
             color: '#DC2626', // Rose Red dashed
-            lineWidth: 2,
+            lineWidth: 2.5,
             lineStyle: LineStyle.Dashed,
             title: `Predicted Close (${currentPrediction.model_name || currentModelKey})`,
             priceFormat: { type: 'price', precision: 2, minMove: 0.01 },
           });
           predictionSeriesRef.current = predSeries;
 
-          predSeries.setData([
-            { time: lastRec.date, value: lastRec.close },
-            { time: nextDateStr, value: currentPrediction.predicted_close },
-          ]);
+          if (predStartPoint.time !== predEndPoint.time) {
+            predSeries.setData([predStartPoint, predEndPoint]);
+          } else {
+            predSeries.setData([predEndPoint]);
+          }
+
+          try {
+            if (typeof predSeries.setMarkers === 'function') {
+              predSeries.setMarkers([
+                {
+                  time: todayDateStr,
+                  position: 'aboveBar',
+                  color: '#DC2626',
+                  shape: 'circle',
+                  text: `Today's Prediction: ${formatCurrency(currentPrediction.predicted_close, currency)}`,
+                },
+              ]);
+            }
+          } catch {
+            // Ignore if setMarkers unavailable
+          }
         }
       }
     } else if (activeTab === 'validation' && testSamples.length > 0) {
@@ -606,9 +795,26 @@ const FinancialChart = ({
         </div>
 
         <div className="chart-header-right">
+          {/* Today Date Badge */}
+          <div className="chart-today-date-badge font-mono">
+            <Calendar size={13} />
+            <span>Today: <strong>{predictionData?.timestamp || predictionData?.date || new Date().toISOString().substring(0, 10)}</strong></span>
+            {predictionData?.timezone && <span className="tz-pill">{predictionData.timezone}</span>}
+          </div>
+
           <div className="market-status-pill">
             <span className="status-live-dot"></span>
-            <span>{activeTab === 'validation' ? 'Holdout Validation Set' : 'Market Data Synced'}</span>
+            <span>
+              {activeTab === 'validation'
+                ? 'Holdout Validation Set'
+                : predictionData?.market_status === 'closed_weekend_holiday'
+                ? 'Market Closed Today'
+                : predictionData?.market_status === 'before_open'
+                ? 'Before Market Open'
+                : predictionData?.market_status === 'after_close'
+                ? 'Market Session Closed'
+                : 'Live Market Open'}
+            </span>
           </div>
         </div>
       </div>

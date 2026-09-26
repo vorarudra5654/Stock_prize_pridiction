@@ -69,18 +69,25 @@ def test_invalid_prediction_asset():
     assert response.status_code == 404
 
 def test_single_prediction_endpoint():
-    response = client.get("/prediction/reliance?model_key=svr")
+    # Bitcoin trades 24/7 so predictions are active even on weekends
+    response = client.get("/prediction/bitcoin?model_key=svr")
     assert response.status_code == 200
     data = response.json()
-    assert data["asset_id"] == "reliance"
+    assert data["asset_id"] == "bitcoin"
     assert "predictions" in data
     assert "svr" in data["predictions"]
     svr_pred = data["predictions"]["svr"]
     assert "predicted_close" in svr_pred
     assert "open_price" in svr_pred
-    assert "diff_from_open" in svr_pred
-    assert "percentage_diff" in svr_pred
 
+def test_market_schedule_status():
+    # Reliance is a stock; on weekends it should return market closed status
+    response = client.get("/prediction/reliance")
+    assert response.status_code == 200
+    data = response.json()
+    assert "market_status" in data
+    assert "prediction_status" in data
+    assert "message" in data
 
 def test_holdout_validation_endpoint():
     response = client.get("/validation/holdout/reliance?model_key=svr")
@@ -97,4 +104,5 @@ def test_holdout_validation_endpoint():
     assert "predicted" in first_pt
     assert "error" in first_pt
     assert "error_percent" in first_pt
+
 

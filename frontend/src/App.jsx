@@ -27,7 +27,13 @@ const MainAppContent = () => {
       );
     }
 
-    if (path === '/models' || path === '/models/') {
+    // Match /models, /model, /models/, /model/
+    if (
+      path === '/models' ||
+      path === '/models/' ||
+      path === '/model' ||
+      path === '/model/'
+    ) {
       return (
         <ModelsOverview
           assets={assetDataProps.assets}
@@ -44,9 +50,9 @@ const MainAppContent = () => {
       return <AboutPage />;
     }
 
-    // Match /models/:slug or /models/:slug/about
-    if (path.startsWith('/models/')) {
-      const parts = path.split('/').filter(Boolean); // ['models', 'linear-regression'] or ['models', 'linear-regression', 'about']
+    // Match /models/:slug, /model/:slug, /models/:slug/about, /model/:slug/about
+    if (path.startsWith('/models/') || path.startsWith('/model/')) {
+      const parts = path.split('/').filter(Boolean); // ['models', 'linear-regression'] or ['model', 'svr']
       if (parts.length >= 2) {
         const modelSlug = parts[1];
         const isAbout = parts.length >= 3 && parts[2] === 'about';

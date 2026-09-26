@@ -118,6 +118,25 @@ def post_custom_prediction_endpoint(payload: CustomPredictionRequest):
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Prediction failed: {str(e)}")
 
+from app.services.prediction_service import get_daily_lifecycle_workflow
+
+@router.get("/prediction/daily-workflow/{asset_id}", tags=["Prediction"])
+def get_daily_workflow_endpoint(asset_id: str):
+    """
+    Daily Prediction Lifecycle Endpoint:
+    Returns the 3-stage forecasting pipeline:
+    1. Evening/Closed: Predict Tomorrow's Open
+    2. Morning/Opens: Predict Tomorrow's Close
+    3. Closed: Compare Predicted Close vs Actual Close
+    """
+    try:
+        return get_daily_lifecycle_workflow(asset_id)
+    except ValueError as ve:
+        raise HTTPException(status_code=404, detail=str(ve))
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Daily workflow error: {str(e)}")
+
+
 from app.services.holdout_validation_service import get_holdout_validation_data
 from app.models.schemas import (
     AssetInfoResponse,

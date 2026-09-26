@@ -4,14 +4,7 @@ const getApiBaseUrl = () => {
     return envUrl.trim().replace(/\/+$/, '');
   }
 
-  if (typeof window !== 'undefined') {
-    const { hostname } = window.location;
-    if (hostname === 'localhost' || hostname === '127.0.0.1' || hostname === '::1') {
-      return 'http://localhost:8000';
-    }
-  }
-
-  // Hosted production environment fallback to live Render backend
+  // Live Render backend URL as default fallback
   return 'https://stock-prize-pridiction-mk3p.onrender.com';
 };
 
@@ -96,4 +89,13 @@ export const fetchHoldoutValidation = async (assetId, modelKey = 'svr') => {
     `Failed to fetch holdout validation data for ${assetId}`
   );
 };
+
+export const fetchDailyWorkflow = async (assetId) => {
+  return await apiFetch(
+    `/prediction/daily-workflow/${assetId}`,
+    {},
+    `Failed to fetch daily workflow data for ${assetId}`
+  );
+};
+
 

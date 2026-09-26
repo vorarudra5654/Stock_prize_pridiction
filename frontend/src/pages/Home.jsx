@@ -3,6 +3,7 @@ import { Link } from '../router/RouterContext';
 import { MODELS_LIST } from '../data/modelsData';
 import ModelCard from '../components/ModelCard';
 import WorkflowDiagram from '../components/WorkflowDiagram';
+import DailyWorkflowCard from '../components/DailyWorkflowCard';
 import MetricCard from '../components/MetricCard';
 import {
   Sparkles,
@@ -164,6 +165,11 @@ const Home = ({ assets = [], comparisonData }) => {
         {/* Visual Pipeline Embed */}
         <div className="home-workflow-embed">
           <WorkflowDiagram title="End-to-End Market Prediction Pipeline" />
+        </div>
+
+        {/* Daily 3-Stage Market Prediction Lifecycle */}
+        <div className="home-workflow-embed" style={{ marginTop: '24px' }}>
+          <DailyWorkflowCard assetId="reliance" currency="INR" />
         </div>
       </section>
 
